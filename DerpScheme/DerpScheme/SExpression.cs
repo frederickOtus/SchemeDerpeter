@@ -17,11 +17,9 @@ namespace DerpScheme
         abstract public SExpression apply(List<SExpression> args, Environment e);
     }
 
-    class SPrimitive : SApplicable
+    class SPrimitive : SApplicable // SPrimitive is a function defined in C# by the interpreter
     {
-        private List<string> args;
         Func f;
-
         public SPrimitive(Func d) { f = d; }
 
         override public SExpression apply(List<SExpression> args, Environment e)
@@ -32,18 +30,19 @@ namespace DerpScheme
         public override string ToString() { return "#primative"; }
     }
 
-    class SFunc : SApplicable
+    class SFunc : SApplicable //SFuncs are lambda functions
     {
-        private Environment env;
-        private List<SID> names;
-        private SExpression body;
+        private Environment env; //private environment for sweet, sweet closures
+        private List<SID> names; //names bound in definition
+        private SExpression body; //body of execution
 
         public SFunc(List<SID> names, SList body, Environment e)
         {
+            //our starting environment is the env we were defined in
             env = new Environment(e);
             foreach(SID id in names)
             {
-                env.addVal(id.identifier, new SNone());
+                env.addVal(id.identifier, new SNone()); //add bound variables to environment with default None value
             }
             this.names = names;
             this.body = body;
@@ -55,9 +54,10 @@ namespace DerpScheme
                 throw new Exception("Incorrect number of args");
             for(int i = 0; i < args.Count; i++)
             {
+                //evaluate all of the args and bind them to my local env according to their cooresponding values
                 env.setLocalVal(names[i].identifier, DerpScheme.DerpInterpreter.evaluate(args[i], e));
             }
-            return DerpScheme.DerpInterpreter.evaluate(body, env);
+            return DerpScheme.DerpInterpreter.evaluate(body, env); //execute lambda and return
         }
 
         public override string ToString() { return "#procedure"; } 
@@ -70,6 +70,16 @@ namespace DerpScheme
         public override string ToString()
         {
             return "<ID: " + identifier + ">";
+        }
+    }
+
+    class SSymbol : SAtomic {
+        public string name;
+        public SSymbol(string val) { name = val; }
+
+        public override string ToString()
+        {
+            return "<Sym: " + name + ">";
         }
     }
 
@@ -94,10 +104,11 @@ namespace DerpScheme
 
     class SList : SExpression
     {
-        //Lists are represented a LIFO List
+        //Lists are really just a stack. We'll represent this as a list in which we only add and remove elements from the end of/
+        //  In scheme, you maniupulate lists by pushing and popping from the head. Thus, it's hella easier add / remove from end of list
         public List<SExpression> elements;
 
-        public SList(List<SExpression> elms) { elements = elms; elements.Reverse(); }
+        public SList(List<SExpression> elms) { elements = elms; elements.Reverse(); } //because head is last element, we need to invert a normal list to make it an SList
         public SList() { this.elements = new List<SExpression>(); }
 
         public bool isEmpty() { return elements.Count == 0; }
@@ -124,7 +135,7 @@ namespace DerpScheme
 
             string rval = "(";
 
-            for(int i = elements.Count() - 1; i > 0; i--)
+            for(int i = elements.Count() - 1; i > 0; i--) //if it is an impoper list, you'll print a . before the last elm, so iterate to elm n-1
             {
                 rval += elements[i].ToString() + " ";
             }

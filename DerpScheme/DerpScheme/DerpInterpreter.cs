@@ -8,7 +8,7 @@ namespace DerpScheme
 {
     class Environment
     {
-
+        //track Name/Value pairs, also has heiracrhy
         private Environment parent;
         private Dictionary<string, SExpression> store;
 
@@ -29,16 +29,17 @@ namespace DerpScheme
                 store[id] = val;
 
             if(parent == null)
-                throw new Exception("Bad id!");
+                throw new Exception(String.Format("ID {0} does not exist", id));
 
             parent.setVal(id, val);
         }
+
         public void setLocalVal(string id, SExpression val)
         {
             if (store.Keys.Contains(id))
                 store[id] = val;
             else
-                throw new Exception("Bad id!");
+                throw new Exception(String.Format("ID {0} does not exist", id));
         }
 
         public bool hasParent() { return parent != null; }
@@ -57,46 +58,30 @@ namespace DerpScheme
     {
         Environment e;
 
-
         public static void Main()
         {
-            String text = "";
-            try
-            {   // Open the text file using a stream reader.
-                using (StreamReader sr = new StreamReader("SampleCode/test.sc"))
-                {
-                    // Read the stream to a string, and write the string to the console.
-                    text = sr.ReadToEnd();
-                }
-            }
-            catch (Exception e)
+            DerpInterpreter interp = new DerpInterpreter();
+
+            Console.WriteLine("Welcome to the Derpiter!");
+            while (true)
             {
-                Console.WriteLine("The file could not be read:");
-                Console.WriteLine(e.Message);
+                Console.Write("> ");
+                string input = Console.ReadLine();
+                if (input == "exit")
+                    return;
+                Console.WriteLine(interp.interpret(input));
             }
-
-            List<Token> tokens = DerpParser.Tokenize(text);
-            List<SExpression> ptree = DerpParser.Parse(tokens);
-
-            foreach (SExpression s in ptree)
-            {
-                Console.WriteLine(s);
-            }
-
-            DerpInterpreter ci = new DerpInterpreter();
-            foreach (SExpression sxp in ptree)
-                Console.WriteLine(ci.interpret(sxp));
         }
 
         public DerpInterpreter() {
-
-
-
             e = new Environment();
 
             //create and load primitive functions
             Func plus = delegate (List<SExpression> args, Environment e)
             {
+                if (args.Count == 0)
+                    new SInt(0);
+
                 int rval = 0;
                 foreach (SExpression s in args)
                 {
@@ -105,8 +90,23 @@ namespace DerpScheme
                 }
                 return new SInt(rval);
             };
+            Func sub = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count == 0)
+                    return new SInt(0);
+                int rval = ((SInt)evaluate(args[0], e)).val;
+
+                for(int i = 1; i < args.Count; i++)
+                {
+                    SExpression tmp = evaluate(args[i], e);
+                    rval -= ((SInt)tmp).val;
+                }
+                return new SInt(rval);
+            };
             Func mult = delegate (List<SExpression> args, Environment e)
             {
+                if (args.Count == 0)
+                    return new SInt(1);
                 int rval = 1;
                 foreach (SExpression s in args)
                 {
@@ -161,9 +161,30 @@ namespace DerpScheme
 
                 return new SFunc(names, body, e);
             };
+            Func div = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count != 2)
+                    throw new Exception(String.Format("Expected 2 args, got {0}", args.Count));
+                SExpression a = evaluate(args[0], e);
+                SExpression b = evaluate(args[1], e);
+                int rval = ((SInt)a).val / ((SInt)b).val;
+                return new SInt(rval);
+            };
+            Func mod = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count != 2)
+                    throw new Exception(String.Format("Expected 2 args, got {0}", args.Count));
+                SExpression a = evaluate(args[0], e);
+                SExpression b = evaluate(args[1], e);
+                int rval = ((SInt)a).val % ((SInt)b).val;
+                return new SInt(rval);
+            };
 
             e.addVal("+", new SPrimitive(plus));
             e.addVal("*", new SPrimitive(mult));
+            e.addVal("/", new SPrimitive(div));
+            e.addVal("-", new SPrimitive(sub));
+            e.addVal("mod", new SPrimitive(mod));
             e.addVal("if", new SPrimitive(ifExpr));
             e.addVal("let", new SPrimitive(let));
             e.addVal("define", new SPrimitive(define));
@@ -203,10 +224,21 @@ namespace DerpScheme
             return ((SApplicable)head).apply(args, e);
         }
 
-        public string interpret(SExpression expr)
+        public string interpret(String text)
         {
-            return evaluate(expr, e).ToString();
-        }
+            try {
+                List<Token> tokens = DerpParser.Tokenize(text);
+                List<SExpression> ptree = DerpParser.Parse(tokens);
 
+                string res = "";
+
+                foreach (SExpression sxp in ptree)
+                    res += DerpInterpreter.evaluate(sxp, e).ToString() + "\n";
+                return res;
+            }catch(Exception e)
+            {
+                return "Error: " + e.Message;
+            }
+        }
     }
 }

@@ -150,10 +150,15 @@ namespace DerpScheme
             };
             Func lambda = delegate (List<SExpression> args, Environment e)
             {
-                SList nameList = (SList)args[0];
-                SList body = (SList)args[1];
-                List<SID> names = new List<SID>();
+                SExpression body = args[1];
+                if (args[0] is SID) //If arg 0 is a single SID, that means this func takes a variable # of args, and thus will have a single name for the list of args
+                {
+                    return new SFunc((SID)args[0], body, e);
+                }
 
+                //otherwise, build the list of names and pass it off to the other constructor
+                SList nameList = (SList)args[0];
+                List<SID> names = new List<SID>();
                 for(int i = nameList.elements.Count - 1; i > 0; i--)
                 {
                     names.Add((SID)nameList.elements[i]);
@@ -179,6 +184,15 @@ namespace DerpScheme
                 int rval = ((SInt)a).val % ((SInt)b).val;
                 return new SInt(rval);
             };
+            Func debug = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count != 1)
+                    throw new Exception(String.Format("Expected 1 args, got {0}", args.Count));
+                SExpression a = evaluate(args[0], e);
+                Console.WriteLine("DB: " + a.DebugString());
+                return new SNone();
+            };
+
 
             e.addVal("+", new SPrimitive(plus));
             e.addVal("*", new SPrimitive(mult));
@@ -189,6 +203,8 @@ namespace DerpScheme
             e.addVal("let", new SPrimitive(let));
             e.addVal("define", new SPrimitive(define));
             e.addVal("lambda", new SPrimitive(lambda));
+            e.addVal("debug", new SPrimitive(debug));
+
         }
 
         public static SExpression evaluate(SExpression expr, Environment e)

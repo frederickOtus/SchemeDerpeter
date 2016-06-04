@@ -15,6 +15,7 @@ namespace DerpScheme
     abstract class SExpression
     {
         public Token originalToken;
+        abstract public string DebugString();
     }
     abstract class SAtomic : SExpression { }
     abstract class SApplicable : SAtomic
@@ -33,17 +34,20 @@ namespace DerpScheme
         }
 
         public override string ToString() { return "#primative"; }
+        public override string DebugString() { return "<PRIMATIVE>";  }
     }
 
     class SFunc : SApplicable //SFuncs are lambda functions
     {
+        private SID arglist;
         private Environment env; //private environment for sweet, sweet closures
         private List<SID> names; //names bound in definition
         private SExpression body; //body of execution
 
-        public SFunc(List<SID> names, SList body, Environment e)
+        public SFunc(List<SID> names, SExpression body, Environment e)
         {
             //our starting environment is the env we were defined in
+            arglist = null;
             env = new Environment(e);
             foreach(SID id in names)
             {
@@ -53,19 +57,67 @@ namespace DerpScheme
             this.body = body;
         }
 
-        override public SExpression apply(List<SExpression> args, Environment e)
+        public SFunc(SID arglst, SExpression body, Environment e)
         {
-            if (args.Count != names.Count)
-                throw new Exception("Incorrect number of args");
-            for(int i = 0; i < args.Count; i++)
-            {
-                //evaluate all of the args and bind them to my local env according to their cooresponding values
-                env.setLocalVal(names[i].identifier, DerpScheme.DerpInterpreter.evaluate(args[i], e));
-            }
-            return DerpScheme.DerpInterpreter.evaluate(body, env); //execute lambda and return
+            arglist = arglst;
+            names = null;
+
+            //our starting environment is the env we were defined in
+            env = new Environment(e);
+            env.addVal(arglist.identifier, new SNone()); //add bound variables to environment with default None value
+            
+            this.body = body;
         }
 
-        public override string ToString() { return "#procedure"; } 
+        override public SExpression apply(List<SExpression> args, Environment e)
+        {
+            //There are two styles of arguments:
+            //      -names for all args
+            //      -single name, all args are a list
+
+            //if arglist is null, verify number of args, eval them, and add them to the environment
+            if (arglist == null)
+            {
+                if (args.Count != names.Count)
+                    throw new Exception("Incorrect number of args");
+                for (int i = 0; i < args.Count; i++)
+                {
+                    //evaluate all of the args and bind them to my local env according to their cooresponding values
+                    env.setLocalVal(names[i].identifier, DerpScheme.DerpInterpreter.evaluate(args[i], e));
+                }
+            }
+            else //otherwise, convert our args to an SList and bind them to environment
+            {
+                args.Add(new SList());
+                SList argSList = new SList(args);
+                env.setLocalVal(arglist.identifier, argSList);
+            }
+
+            //finally actually execute body
+            return DerpScheme.DerpInterpreter.evaluate(body, env);
+        }
+
+        public override string ToString() { return "#procedure"; }
+        public override string DebugString() {
+            string rval = "<FUNC: ";
+            if (arglist == null) //multiple arg names
+            {
+                for(int i = 0; i < names.Count; i++)
+                {
+                    if (i == 0)
+                        rval += names[0].identifier;
+                    else
+                        rval += names[i].identifier;
+                }
+            }
+            else
+            {
+                rval += "(" + arglist.identifier + ")";
+            }
+
+            rval += " | " + body.DebugString();
+            return rval + ">";
+        }
     }
 
     class SID : SExpression {
@@ -73,6 +125,11 @@ namespace DerpScheme
         public SID(string id) { identifier = id; }
 
         public override string ToString()
+        {
+            return identifier;
+        }
+
+        public override string  DebugString()
         {
             return "<ID: " + identifier + ">";
         }
@@ -83,6 +140,11 @@ namespace DerpScheme
         public SSymbol(string val) { name = val; }
 
         public override string ToString()
+        {
+            return "'" + name;
+        }
+
+        public override string DebugString()
         {
             return "<Sym: " + name + ">";
         }
@@ -95,6 +157,11 @@ namespace DerpScheme
         {
             return val.ToString();
         }
+
+        public override string DebugString()
+        {
+            return "<INT: " + val.ToString() + ">";
+        }
     }
 
     class SBool : SAtomic
@@ -104,6 +171,12 @@ namespace DerpScheme
         public override string ToString()
         {
             return val ? "#t" : "#f";
+        }
+
+        public override string DebugString()
+        {
+            string t = val ? "TRUE" : "FALSE";
+            return "<BOOL: " + t + ">";
         }
     }
 
@@ -136,19 +209,43 @@ namespace DerpScheme
 
         public override string ToString()
         {
-            if (isEmpty()) { return "<Empty List>"; }
+            if (isEmpty()) { return "'()"; }
 
-            string rval = "(";
+            string rval = "'(";
 
             for(int i = elements.Count() - 1; i > 0; i--) //if it is an impoper list, you'll print a . before the last elm, so iterate to elm n-1
             {
-                rval += elements[i].ToString() + " ";
+                if(i == elements.Count() - 1)
+                    rval += elements[i].ToString();
+                else
+                    rval += " " + elements[i].ToString();
+
             }
 
             if (!isProperList())
-                rval += ". ";
+                rval += ". " + elements.First().ToString();
 
-            rval += elements.First().ToString() + ")";
+            rval += ")";
+
+            return rval;
+        }
+
+        public override string DebugString()
+        {
+            if (isEmpty()) { return "<Empty List>"; }
+
+            string rval = "<LIST: ";
+
+            for (int i = elements.Count() - 1; i > -1; i--) //if it is an impoper list, you'll print a . before the last elm, so iterate to elm n-1
+            {
+                if (i == elements.Count() - 1)
+                    rval += elements[i].DebugString();
+                else
+                    rval += " " + elements[i].DebugString();
+
+            }
+
+            rval += ">";
 
             return rval;
         }
@@ -158,6 +255,11 @@ namespace DerpScheme
     class SNone : SExpression
     {
         public override string ToString()
+        {
+            return "";
+        }
+
+        public override string DebugString()
         {
             return "<NONE>";
         }

@@ -57,6 +57,7 @@ namespace DerpScheme
     class DerpInterpreter
     {
         Environment e;
+        public DerpParser parser;
 
         public static void Main()
         {
@@ -65,16 +66,23 @@ namespace DerpScheme
             Console.WriteLine("Welcome to the Derpiter!");
             while (true)
             {
-                Console.Write("> ");
+                if (interp.parser.isDone())
+                    Console.Write("> ");
+                else
+                    Console.Write("\t");
                 string input = Console.ReadLine();
                 if (input == "exit")
                     return;
-                Console.WriteLine(interp.interpret(input));
+               string outs = interp.interpret(input);
+                if (outs == null)
+                    continue;
+                Console.WriteLine(outs);
             }
         }
 
         public DerpInterpreter() {
             e = new Environment();
+            parser = new DerpParser("");
 
             //create and load primitive functions
             Func plus = delegate (List<SExpression> args, Environment e)
@@ -241,16 +249,19 @@ namespace DerpScheme
         public string interpret(String text)
         {
             try {
-                List<Token> tokens = DerpParser.Tokenize(text);
-                List<SExpression> ptree = DerpParser.Parse(tokens);
-
-                string res = "";
-
-                foreach (SExpression sxp in ptree)
-                    res += DerpInterpreter.evaluate(sxp, e).ToString() + "\n";
-                return res;
+                parser.AddTokens(text);
+                if (parser.attemptParse())
+                {
+                    List<SExpression> ptree = parser.flushParseTree();
+                    string res = "";
+                    foreach (SExpression sxp in ptree)
+                        res += DerpInterpreter.evaluate(sxp, e).ToString() + "\n";
+                    return res;
+                }
+                return null;
             }catch(Exception e)
             {
+                parser.flushParseTree();
                 return "Error: " + e.Message;
             }
         }

@@ -14,6 +14,7 @@ namespace DerpScheme
     */
 
     public enum TokenType { Int, LParen, RParen, Id, Symbol, Bool, ListLiteral }
+    public enum ParseState { NeedRParen, Done };
 
     class Token
 
@@ -74,6 +75,7 @@ namespace DerpScheme
     class DerpParser
     {
 
+        /* Static Functions */
         public static List<SExpression> parseCode(string text)
         {
             return Parse(Tokenize(text));
@@ -138,7 +140,7 @@ namespace DerpScheme
             return parseTree;
         }
 
-        public static SExpression ParseSExpression(List<Token> tokens)
+        private static SExpression ParseSExpression(List<Token> tokens)
         {
             //this recursive buddy is pretty simple
             //  pop the top token and process. Most tokens just get converted to their associated SExpression type, but L/R Parens do goofy things.
@@ -173,6 +175,77 @@ namespace DerpScheme
                 default:  //Only happens if I add new token types, but don't add parsing logic for them
                     throw new Exception("Unknown Token Type"); 
             }
+        }
+
+
+        /* OO Version */
+        private ParseState state;
+        private List<Token> tokens;
+        private List<List<SExpression>> parseStack; //stack of the sub expressions we are currently trying to deal with
+        
+        public bool isDone() { return tokens.Count == 0 && parseStack.Count == 1; }
+
+        public DerpParser(string initialText)
+        {
+            parseStack = new List<List<SExpression>>();
+            tokens = DerpParser.Tokenize(initialText);
+            parseStack.Add(new List<SExpression>());
+        }
+
+        public void AddTokens(string text)
+        {
+            tokens = tokens.Concat(Tokenize(text)).ToList();
+        }
+
+        public bool attemptParse()
+        {
+            while(tokens.Count > 0)
+            {
+                //  Emulate recursive behavior with stacks / loops -- Blegh
+                Token top = tokens.First(); //Pop!
+                tokens.RemoveAt(0);         //Pop!
+                SExpression parsedExpr;     //element that we finished parsing
+
+                switch (top.type)
+                {
+                    case TokenType.Int: //pass through
+                        parsedExpr = new SInt(Int32.Parse(top.token));
+                        break;
+                    case TokenType.Id: //pass through
+                        parsedExpr = new SID(top.token);
+                        break;
+                    case TokenType.Bool: //pass through
+                        parsedExpr = new SBool(top.token == "#f");
+                        break;
+                    case TokenType.Symbol: //pass through
+                        parsedExpr = new SSymbol(top.token);
+                        break;
+                    case TokenType.LParen: //LParen means we have a new subexpr to parse, so add to the stack
+                        parseStack.Add(new List<SExpression>());
+                        continue; //we started a new subexpression, so there is nothing to add to the parse tree yet, so skip to top of loop
+                    case TokenType.RParen:  //RParens means we can close a sub expr
+                        if(parseStack.Count == 1) //if count is 1, we are trying to close our root expression. Don't do that.
+                            throw new Exception("Unexpected RParen\n" + top.ToString());
+                        parseStack.Last().Add(new SList()); //Proper lists are terminated with empty list, so add that
+                        parsedExpr = new SList(parseStack.Last()); //Create an slist for our subexpression
+                        parseStack.RemoveAt(parseStack.Count - 1); //remove the subexpression we just finished parsing
+                        break;
+                    default:  //Only happens if I add new token types, but don't add parsing logic for them
+                        throw new Exception("Unknown Token Type");
+                }
+                parseStack.Last().Add(parsedExpr);
+            }
+
+            return parseStack.Count == 1;
+        }
+
+        public List<SExpression> flushParseTree()
+        {
+            tokens = new List<Token>();
+            List<SExpression> sexpr = parseStack.First();
+            parseStack = new List<List<SExpression>>();
+            parseStack.Add(new List<SExpression>());
+            return sexpr;
         }
     }
 }

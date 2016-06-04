@@ -5,7 +5,12 @@ using System.Text;
 
 namespace DerpScheme
 {
-    delegate SExpression Func(List<SExpression> args, Environment e);
+    /*
+        TODO:
+            -Not tracking original tokens, needed for stack traces?
+    */
+
+    delegate SExpression Func(List<SExpression> args, Environment e);// Define type 'Func', anonymous function that operates on a list of args in an environment and produces an SExpression
 
     abstract class SExpression
     {
@@ -126,7 +131,7 @@ namespace DerpScheme
             if (isEmpty()) { return true; }
             SExpression last = elements[0];
             if(!(last is SList)) { return false; }
-            return ((SList)(last)).isEmpty();
+            return ((SList)last).isProperList();
         }
 
         public override string ToString()

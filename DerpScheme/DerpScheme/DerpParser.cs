@@ -13,9 +13,10 @@ namespace DerpScheme
             -form ASTs, and throw errors when they can't be correctly formed
     */
 
-    public enum TokenType { Int, LParen, RParen, Id, Symbol, Bool }
+    public enum TokenType { Int, LParen, RParen, Id, Symbol, Bool, ListLiteral }
 
     class Token
+
     {
         public int col, row;
         public string token;
@@ -45,6 +46,9 @@ namespace DerpScheme
             } else if (t == ")")
             {
                 type = TokenType.RParen;
+            }else if(t == "'(")
+            {
+                type = TokenType.ListLiteral;
             }
             else if (isNum.Success)
             {

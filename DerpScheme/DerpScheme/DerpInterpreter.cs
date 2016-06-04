@@ -209,9 +209,7 @@ namespace DerpScheme
                 throw new Exception("Not a proper list!");
 
             //if head is a SID, lookup val, insure it is callable, then pass control to it
-            SExpression head = exprL.head();
-            if (head is SID)
-                head = e.lookup((SID)head);
+            SExpression head = evaluate(exprL.head(), e);
             
             if (!(head is SApplicable))
                 throw new Exception("SExpression not applicable!");

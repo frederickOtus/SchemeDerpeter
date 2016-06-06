@@ -12,9 +12,11 @@ namespace DerpScheme
 
     delegate SExpression Func(List<SExpression> args, Environment e);// Define type 'Func', anonymous function that operates on a list of args in an environment and produces an SExpression
 
-    abstract class SExpression
+    abstract class SExpression : ICloneable
     {
         public Token originalToken;
+
+        public abstract object Clone();
         abstract public string DebugString();
     }
     abstract class SAtomic : SExpression { }
@@ -35,6 +37,11 @@ namespace DerpScheme
 
         public override string ToString() { return "#primative"; }
         public override string DebugString() { return "<PRIMATIVE>";  }
+
+        public override object Clone()
+        {
+            return new SPrimitive(f);
+        }
     }
 
     class SFunc : SApplicable //SFuncs are lambda functions
@@ -118,6 +125,13 @@ namespace DerpScheme
             rval += " | " + body.DebugString();
             return rval + ">";
         }
+
+        public override object Clone()
+        {
+            if(arglist == null)
+                return new SFunc(names, body, env);
+            return new SFunc(arglist, body, env);
+        }
     }
 
     class SID : SExpression {
@@ -132,6 +146,11 @@ namespace DerpScheme
         public override string  DebugString()
         {
             return "<ID: " + identifier + ">";
+        }
+
+        public override object Clone()
+        {
+            return new SID(identifier);
         }
     }
 
@@ -148,6 +167,11 @@ namespace DerpScheme
         {
             return "<Sym: " + name + ">";
         }
+
+        public override object Clone()
+        {
+            return new SSymbol(name);
+        }
     }
 
     class SInt : SAtomic {
@@ -161,6 +185,11 @@ namespace DerpScheme
         public override string DebugString()
         {
             return "<INT: " + val.ToString() + ">";
+        }
+
+        public override object Clone()
+        {
+            return new SInt(val);
         }
     }
 
@@ -177,6 +206,11 @@ namespace DerpScheme
         {
             string t = val ? "TRUE" : "FALSE";
             return "<BOOL: " + t + ">";
+        }
+
+        public override object Clone()
+        {
+            return new SBool(val);
         }
     }
 
@@ -250,6 +284,15 @@ namespace DerpScheme
             return rval;
         }
 
+        public override object Clone()
+        {
+            SList nl = new SList();
+            foreach(SExpression elm in elements)
+            {
+                nl.appendElm((SExpression)elm.Clone());
+            }
+            return nl;
+        }
     }
 
     class SNone : SExpression
@@ -262,6 +305,11 @@ namespace DerpScheme
         public override string DebugString()
         {
             return "<NONE>";
+        }
+
+        public override object Clone()
+        {
+            return new SNone();
         }
     }
 }

@@ -80,7 +80,7 @@ namespace DerpScheme
             }
         }
 
-        public DerpInterpreter() {
+        public DerpInterpreter()  {
             e = new Environment();
             parser = new DerpParser("");
 
@@ -201,6 +201,92 @@ namespace DerpScheme
                 return new SNone();
             };
 
+            Func cons = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count != 2)
+                    throw new Exception(String.Format("Expected 2 args, got {0}", args.Count));
+
+                SExpression a = evaluate(args[0], e);
+                SExpression b = evaluate(args[1], e);
+
+                if(b is SList)
+                {
+                    SList nsl = (SList)b.Clone();
+                    nsl.appendElm(a);
+                    return nsl;
+                }
+                else
+                {
+                    SList nsl = new SList();
+                    nsl.appendElm((SExpression)b.Clone());
+                    nsl.appendElm((SExpression)a.Clone());
+                    return nsl;
+                }
+            };
+            Func car = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count != 1)
+                    throw new Exception(String.Format("Expected 1 args, got {0}", args.Count));
+
+                SExpression a = evaluate(args[0], e);
+
+                if (a is SList)
+                {
+                    SList al = (SList)a;
+                    return (SExpression)al.head().Clone();
+                }
+                else
+                {
+                    throw new Exception("car expects a list!");
+                }
+            };
+            Func cdr = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count != 1)
+                    throw new Exception(String.Format("Expected 1 args, got {0}", args.Count));
+
+                SExpression a = evaluate(args[0], e);
+
+                if (a is SList)
+                {
+                    SList al = (SList)a;
+                    if (al.isEmpty())
+                        throw new Exception("Called cdr on an empty list!");
+                    SList nl = (SList)al.Clone();
+                    nl.elements.RemoveAt(nl.elements.Count - 1);
+                    return nl;
+                }
+                else
+                {
+                    throw new Exception("cdr expects a list!");
+                }
+            };
+            Func list = delegate (List<SExpression> args, Environment e)
+            {
+                List<SExpression> elms = new List<SExpression>();                
+                foreach (SExpression s in args)
+                {
+                    elms.Add(evaluate(s, e));    
+                }
+                elms.Add(new SList());
+                return new SList(elms);
+            };
+            Func nulllist = delegate (List<SExpression> args, Environment e)
+            {
+                if (args.Count != 1)
+                    throw new Exception(String.Format("Expected 1 args, got {0}", args.Count));
+
+                SExpression a = evaluate(args[0], e);
+
+                if (a is SList)
+                {
+                    return new SBool(((SList)a).isEmpty());
+                }
+                else
+                {
+                    throw new Exception("null? expects a list!");
+                }
+            };
 
             e.addVal("+", new SPrimitive(plus));
             e.addVal("*", new SPrimitive(mult));
@@ -212,6 +298,11 @@ namespace DerpScheme
             e.addVal("define", new SPrimitive(define));
             e.addVal("lambda", new SPrimitive(lambda));
             e.addVal("debug", new SPrimitive(debug));
+            e.addVal("list", new SPrimitive(list));
+            e.addVal("cons", new SPrimitive(cons));
+            e.addVal("car", new SPrimitive(car));
+            e.addVal("cdr", new SPrimitive(cdr));
+            e.addVal("null?", new SPrimitive(nulllist));
 
         }
 

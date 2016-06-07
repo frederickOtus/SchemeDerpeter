@@ -137,10 +137,14 @@ namespace DerpScheme
             Func let = delegate (List<SExpression> args, Environment e)
             {
                 Environment local = new Environment(e);
-                SList nameBindings = (SList)args[0];
-                for(int i=nameBindings.elements.Count - 1; i>0; i--) {
-                    String name = ((SID)((SList)nameBindings.elements[i]).head()).identifier;
-                    SExpression val = ((SList)nameBindings.elements[i]).body().Last();
+                SPair nameBindings = (SPair)args[0];
+                if (!nameBindings.isProperList())
+                    throw new Exception("Can't use improper list in a let");
+
+                List<SExpression> names = nameBindings.flatten();
+                for(int i=0; i<names.Count - 1; i++) {
+                    String name = ((SID)((SPair)names[i]).getHead()).identifier;
+                    SExpression val = ((SPair)((SPair)names[i]).getTail()).getHead();
                     local.addVal(name, evaluate(val, e));
                 }
                 return evaluate(args[1], local);
@@ -165,11 +169,11 @@ namespace DerpScheme
                 }
 
                 //otherwise, build the list of names and pass it off to the other constructor
-                SList nameList = (SList)args[0];
+                List<SExpression> nameList = ((SPair)args[0]).flatten();
                 List<SID> names = new List<SID>();
-                for(int i = nameList.elements.Count - 1; i > 0; i--)
+                for(int i = 0; i <  nameList.Count - 1; i++)
                 {
-                    names.Add((SID)nameList.elements[i]);
+                    names.Add((SID)nameList[i]);
                 }
 
                 return new SFunc(names, body, e);
@@ -209,19 +213,7 @@ namespace DerpScheme
                 SExpression a = evaluate(args[0], e);
                 SExpression b = evaluate(args[1], e);
 
-                if(b is SList)
-                {
-                    SList nsl = (SList)b.Clone();
-                    nsl.appendElm(a);
-                    return nsl;
-                }
-                else
-                {
-                    SList nsl = new SList();
-                    nsl.appendElm((SExpression)b.Clone());
-                    nsl.appendElm((SExpression)a.Clone());
-                    return nsl;
-                }
+                return new SPair(a, b);
             };
             Func car = delegate (List<SExpression> args, Environment e)
             {
@@ -230,10 +222,10 @@ namespace DerpScheme
 
                 SExpression a = evaluate(args[0], e);
 
-                if (a is SList)
+                if (a is SPair)
                 {
-                    SList al = (SList)a;
-                    return (SExpression)al.head().Clone();
+                    SPair al = (SPair)a;
+                    return (SExpression)al.getHead().Clone();
                 }
                 else
                 {
@@ -247,14 +239,9 @@ namespace DerpScheme
 
                 SExpression a = evaluate(args[0], e);
 
-                if (a is SList)
+                if (a is SPair)
                 {
-                    SList al = (SList)a;
-                    if (al.isEmpty())
-                        throw new Exception("Called cdr on an empty list!");
-                    SList nl = (SList)al.Clone();
-                    nl.elements.RemoveAt(nl.elements.Count - 1);
-                    return nl;
+                    return (SExpression)((SPair)a).getTail().Clone();
                 }
                 else
                 {
@@ -263,13 +250,14 @@ namespace DerpScheme
             };
             Func list = delegate (List<SExpression> args, Environment e)
             {
+                if (args.Count == 0)
+                    return new SEmptyList();
                 List<SExpression> elms = new List<SExpression>();                
                 foreach (SExpression s in args)
                 {
                     elms.Add(evaluate(s, e));    
                 }
-                elms.Add(new SList());
-                return new SList(elms);
+                return new SPair(elms, true);
             };
             Func nulllist = delegate (List<SExpression> args, Environment e)
             {
@@ -277,15 +265,7 @@ namespace DerpScheme
                     throw new Exception(String.Format("Expected 1 args, got {0}", args.Count));
 
                 SExpression a = evaluate(args[0], e);
-
-                if (a is SList)
-                {
-                    return new SBool(((SList)a).isEmpty());
-                }
-                else
-                {
-                    throw new Exception("null? expects a list!");
-                }
+                return new SBool(a is SEmptyList);
             };
 
             e.addVal("+", new SPrimitive(plus));
@@ -313,28 +293,26 @@ namespace DerpScheme
                 return e.lookup((SID)expr);
             }
 
-            if (!(expr is SList))
+            if (!(expr is SPair))
                 return expr;
 
-            SList exprL = (SList)expr;
+            SPair exprL = (SPair)expr;
 
-            if (exprL.isEmpty())
-                throw new Exception("Can't apply nothing!");
-            else if (!exprL.isProperList())
+            if (!exprL.isProperList())
                 throw new Exception("Not a proper list!");
 
             //if head is a SID, lookup val, insure it is callable, then pass control to it
-            SExpression head = evaluate(exprL.head(), e);
+            List<SExpression> elms = exprL.flatten();
+            SExpression head = evaluate(elms[0], e);
             
             if (!(head is SApplicable))
                 throw new Exception("SExpression not applicable!");
 
             //args are going to be body. But because this is a proper list, the last element is going to be a empty list we want to drop
-            List<SExpression> args = exprL.body();
-            args.RemoveAt(0); //drop empty list
-            args.Reverse(); //reverse order so it is fifo for function to deal with
+            elms.RemoveAt(0); //drop head
+            elms.RemoveAt(elms.Count - 1); // remove empty list at end
 
-            return ((SApplicable)head).apply(args, e);
+            return ((SApplicable)head).apply(elms, e);
         }
 
         public string interpret(String text)

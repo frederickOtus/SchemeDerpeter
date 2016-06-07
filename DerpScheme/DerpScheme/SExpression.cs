@@ -93,10 +93,9 @@ namespace DerpScheme
                     env.setLocalVal(names[i].identifier, DerpScheme.DerpInterpreter.evaluate(args[i], e));
                 }
             }
-            else //otherwise, convert our args to an SList and bind them to environment
+            else //otherwise, convert our args to an SPair and bind them to environment
             {
-                args.Add(new SList());
-                SList argSList = new SList(args);
+                SPair argSList = new SPair(args, true);
                 env.setLocalVal(arglist.identifier, argSList);
             }
 
@@ -214,84 +213,113 @@ namespace DerpScheme
         }
     }
 
-    class SList : SExpression
+    class SPair : SExpression
     {
         //Lists are really just a stack. We'll represent this as a list in which we only add and remove elements from the end of/
         //  In scheme, you maniupulate lists by pushing and popping from the head. Thus, it's hella easier add / remove from end of list
-        public List<SExpression> elements;
 
-        public SList(List<SExpression> elms) { elements = elms; elements.Reverse(); } //because head is last element, we need to invert a normal list to make it an SList
-        public SList() { this.elements = new List<SExpression>(); }
+        private SExpression head;
+        private SExpression tail;
 
-        public bool isEmpty() { return elements.Count == 0; }
-        public void appendElm(SExpression elm) { elements.Add(elm); }
-        public SExpression head() { return elements[elements.Count - 1]; }
-        public List<SExpression> body()
+        public SPair(List<SExpression> elms, bool makeProper = false) {
+            if (makeProper)
+                elms.Add(new SEmptyList());
+            if (elms.Count == 0)
+                throw new Exception("Error no elms to create chain of pairs");
+            if (elms.Count == 1)
+            {
+                head = elms[0];
+                tail = new SEmptyList();
+                return;
+            }
+
+            if(elms.Count == 2)
+            {
+                head = elms[0];
+                tail = elms[1];
+                return;
+            }
+
+            SPair root = new SPair(elms[elms.Count - 2], elms[elms.Count - 1]);
+            for(int i = elms.Count - 3; i >  0; i--)
+            {
+                root = new SPair(elms[i], root);
+            }
+            head = elms[0];
+            tail = root;
+        }
+        
+        public SPair(SExpression head, SExpression tail) { this.head = head; this.tail = tail; }
+
+        public List<SExpression> flatten()
         {
-            return elements.Take(elements.Count - 1).ToList();
+            List<SExpression> elms = new List<SExpression>();
+            elms.Add(head);
+            if (tail is SPair)
+            {
+                elms = elms.Concat(((SPair)tail).flatten()).ToList();
+            }
+            else
+            {
+                elms.Add(tail);
+            }
+            return elms;
         }
 
-        public void setHead(SExpression expr) { elements[elements.Count - 1] = expr; }
+        public SExpression getHead() { return head; }
+        public void setHead(SExpression expr) { head = expr; }
+        public SExpression getTail() { return tail; }
 
         public bool isProperList()
         {
-            if (isEmpty()) { return true; }
-            SExpression last = elements[0];
-            if(!(last is SList)) { return false; }
-            return ((SList)last).isProperList();
+            if (tail is SPair)
+                return ((SPair)tail).isProperList();
+            return tail is SEmptyList;
         }
 
         public override string ToString()
         {
-            if (isEmpty()) { return "'()"; }
+            string hstring = head.ToString();
+            string tstring = tail.ToString();
 
-            string rval = "'(";
+            if (head is SEmptyList || head is SPair)
+                hstring = hstring.Substring(1, hstring.Length - 1);
 
-            for(int i = elements.Count() - 1; i > 0; i--) //if it is an impoper list, you'll print a . before the last elm, so iterate to elm n-1
-            {
-                if(i == elements.Count() - 1)
-                    rval += elements[i].ToString();
-                else
-                    rval += " " + elements[i].ToString();
+            if (tail is SPair)
+                tstring = tstring.Substring(2,tstring.Length - 3);
 
-            }
+            if (tail is SEmptyList)
+                return "'(" + hstring + ")";
 
-            if (!isProperList())
-                rval += ". " + elements.First().ToString();
+            if (!(tail is SPair))
+                return "'(" + hstring + " . " + tstring + ")";
 
-            rval += ")";
-
-            return rval;
+            return "'(" + hstring + " " + tstring + ")";
         }
-
         public override string DebugString()
-        {
-            if (isEmpty()) { return "<Empty List>"; }
-
-            string rval = "<LIST: ";
-
-            for (int i = elements.Count() - 1; i > -1; i--) //if it is an impoper list, you'll print a . before the last elm, so iterate to elm n-1
-            {
-                if (i == elements.Count() - 1)
-                    rval += elements[i].DebugString();
-                else
-                    rval += " " + elements[i].DebugString();
-
-            }
-
-            rval += ">";
-
-            return rval;
+        { 
+            return "<PAIR: " + head.DebugString() + ", " + tail.DebugString() + ">";
         }
 
         public override object Clone()
         {
-            SList nl = new SList();
-            foreach(SExpression elm in elements)
-            {
-                nl.appendElm((SExpression)elm.Clone());
-            }
-            return nl;
+            return new SPair((SExpression)head.Clone(), (SExpression)tail.Clone());
+        }
+    }
+
+    class SEmptyList : SExpression
+    {
+        public override object Clone()
+        {
+            return new SEmptyList();
+        }
+        public override string DebugString()
+        {
+            return "<EMPTY LIST>";
+        }
+        public override string ToString()
+        {
+            return "'()";
         }
     }
 

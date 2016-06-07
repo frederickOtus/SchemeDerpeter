@@ -164,9 +164,8 @@ namespace DerpScheme
                     {
                         if (tokens.First().type == TokenType.RParen)
                         {
-                            elms.Add(new SList()); //Proper lists are terminated with empty list, so add that
                             tokens.RemoveAt(0); //pop the RParen off the stack
-                            return new SList(elms); //We're done! Return parsed list!
+                            return new SPair(elms, true); //We're done! Return parsed list!
                         }
                         elms.Add(ParseSExpression(tokens));  //Get SExpression for my non-RParen token
                     }
@@ -226,8 +225,7 @@ namespace DerpScheme
                     case TokenType.RParen:  //RParens means we can close a sub expr
                         if(parseStack.Count == 1) //if count is 1, we are trying to close our root expression. Don't do that.
                             throw new Exception("Unexpected RParen\n" + top.ToString());
-                        parseStack.Last().Add(new SList()); //Proper lists are terminated with empty list, so add that
-                        parsedExpr = new SList(parseStack.Last()); //Create an slist for our subexpression
+                        parsedExpr = new SPair(parseStack.Last(), true); //Create an slist for our subexpression
                         parseStack.RemoveAt(parseStack.Count - 1); //remove the subexpression we just finished parsing
                         break;
                     default:  //Only happens if I add new token types, but don't add parsing logic for them

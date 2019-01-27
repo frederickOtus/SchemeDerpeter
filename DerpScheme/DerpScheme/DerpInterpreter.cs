@@ -339,6 +339,20 @@ namespace DerpScheme
             bool rval = ((SInt)args[0]).val < ((SInt)args[1]).val;
             yield return new ExecutionMessage(ExecStatus.DONE, new SBool(rval));
         }
+
+        private IEnumerable<ExecutionMessage> TypeOf(List<SExpression> args, Environment e)
+        {
+            yield return new ExecutionMessage(ExecStatus.DONE, new SID(args[0].GetType().Name));
+        }
+
+        private IEnumerable<ExecutionMessage> Eval(List<SExpression> args, Environment e)
+        {
+            foreach(var msg in evaluate(args[0], e))
+            {
+                yield return msg;
+            }
+        }
+
         #endregion
 
 
@@ -368,6 +382,8 @@ namespace DerpScheme
             e.addVal(">", new SPrimitive(SGt, true, 2));
             e.addVal("<", new SPrimitive(SLt, true, 2));
             e.addVal("begin", new SPrimitive(SBegin, false, 0));
+            e.addVal("typeof", new SPrimitive(TypeOf, false, 1));
+            e.addVal("eval", new SPrimitive(Eval, false, 1));
 
         }
 

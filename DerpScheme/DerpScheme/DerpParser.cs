@@ -35,7 +35,7 @@ namespace DerpScheme
             row = r; col = c; token = t;
             Regex numReg = new Regex(@"^\d+$"); //only support ints for the time being
             Regex symReg = new Regex(@"'[a-zA-Z0-9+-=/*]+");
-            Regex idReg = new Regex(@"[a-zA-Z+-=/*][a-zA-Z0-9+-=/*]*");
+            Regex idReg = new Regex(@"[a-zA-Z+-=/*<>][a-zA-Z0-9+-=/*]*");
 
             Match isNum = numReg.Match(t);
             Match isSym = symReg.Match(t);

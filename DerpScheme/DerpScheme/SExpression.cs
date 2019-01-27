@@ -5,51 +5,47 @@ using System.Text;
 
 namespace DerpScheme
 {
+    using SFunction = Func<List<SExpression>, Environment, IEnumerable<ExecutionMessage>>;
     /*
         TODO:
             -Not tracking original tokens, needed for stack traces?
     */
 
-    delegate SExpression Func(List<SExpression> args, Environment e);// Define type 'Func', anonymous function that operates on a list of args in an environment and produces an SExpression
-
     abstract class SExpression : ICloneable
     {
         public Token originalToken;
-
         public abstract object Clone();
         abstract public string DebugString();
     }
     abstract class SAtomic : SExpression { }
     abstract class SApplicable : SAtomic
     {
-        abstract public SExpression apply(List<SExpression> args, Environment e);
+        public bool fixedArgCount;
+        public int argCount;
+        public bool preEval = true;
     }
 
     class SPrimitive : SApplicable // SPrimitive is a function defined in C# by the interpreter
     {
-        Func f;
-        public SPrimitive(Func d) { f = d; }
-
-        override public SExpression apply(List<SExpression> args, Environment e)
-        {
-            return f(args, e);
-        }
+        
+        public SFunction func;
+        public SPrimitive(SFunction f, bool fac, int ac, bool preEval = true) { func = f; fixedArgCount = fac; argCount = ac; this.preEval = preEval; }
 
         public override string ToString() { return "#primative"; }
         public override string DebugString() { return "<PRIMATIVE>";  }
 
         public override object Clone()
         {
-            return new SPrimitive(f);
+            return new SPrimitive(func, fixedArgCount, argCount);
         }
     }
 
     class SFunc : SApplicable //SFuncs are lambda functions
     {
-        private SID arglist;
-        private Environment env; //private environment for sweet, sweet closures
-        private List<SID> names; //names bound in definition
-        private SExpression body; //body of execution
+        public SID arglist;
+        public Environment env; //private environment for sweet, sweet closurepublipublic
+        public List<SID> names; //names bound in definition
+        public SExpression body; //body of execution
 
         public SFunc(List<SID> names, SExpression body, Environment e)
         {
@@ -62,6 +58,8 @@ namespace DerpScheme
             }
             this.names = names;
             this.body = body;
+            fixedArgCount = true;
+            argCount = names.Count;
         }
 
         public SFunc(SID arglst, SExpression body, Environment e)
@@ -72,35 +70,9 @@ namespace DerpScheme
             //our starting environment is the env we were defined in
             env = new Environment(e);
             env.addVal(arglist.identifier, new SNone()); //add bound variables to environment with default None value
+            fixedArgCount = false;
             
             this.body = body;
-        }
-
-        override public SExpression apply(List<SExpression> args, Environment e)
-        {
-            //There are two styles of arguments:
-            //      -names for all args
-            //      -single name, all args are a list
-
-            //if arglist is null, verify number of args, eval them, and add them to the environment
-            if (arglist == null)
-            {
-                if (args.Count != names.Count)
-                    throw new Exception("Incorrect number of args");
-                for (int i = 0; i < args.Count; i++)
-                {
-                    //evaluate all of the args and bind them to my local env according to their cooresponding values
-                    env.setLocalVal(names[i].identifier, DerpScheme.DerpInterpreter.evaluate(args[i], e));
-                }
-            }
-            else //otherwise, convert our args to an SPair and bind them to environment
-            {
-                SPair argSList = new SPair(args, true);
-                env.setLocalVal(arglist.identifier, argSList);
-            }
-
-            //finally actually execute body
-            return DerpScheme.DerpInterpreter.evaluate(body, env);
         }
 
         public override string ToString() { return "#procedure"; }
@@ -127,7 +99,7 @@ namespace DerpScheme
 
         public override object Clone()
         {
-            if(arglist == null)
+            if(fixedArgCount)
                 return new SFunc(names, body, env);
             return new SFunc(arglist, body, env);
         }
